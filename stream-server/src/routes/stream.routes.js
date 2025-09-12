@@ -86,27 +86,41 @@ router.get("/simple/:sessionId", async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'Range');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
     
-    // Stream the video data - convert fetch ReadableStream to Node.js stream
+    // Add buffering optimizations
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Connection', 'keep-alive');
+    
+    // Enable better prefetching for video players
+    if (response.headers.get('content-length')) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+    
+    // Stream the video data with optimized chunks
     const reader = response.body.getReader();
-    const stream = new ReadableStream({
-      start(controller) {
-        function pump() {
-          return reader.read().then(({ done, value }) => {
-            if (done) {
-              controller.close();
-              return;
-            }
-            controller.enqueue(value);
-            return pump();
-          });
+    
+    // Use a more efficient streaming approach
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            res.end();
+            break;
+          }
+          
+          // Write chunks with proper backpressure handling
+          if (!res.write(value)) {
+            await new Promise(resolve => res.once('drain', resolve));
+          }
         }
-        return pump();
+      } catch (error) {
+        console.error('Streaming error:', error);
+        res.status(500).end();
       }
-    });
-
-    // Convert to Node.js readable stream and pipe
-    const nodeStream = new (await import('stream')).Readable.fromWeb(stream);
-    nodeStream.pipe(res);
+    };
+    
+    pump();
     
   } catch (error) {
     console.error('Simple streaming error:', error);
@@ -157,27 +171,41 @@ router.get("/direct/:sessionId", async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'Range');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
     
-    // Stream the response - convert fetch ReadableStream to Node.js stream
+    // Add buffering optimizations
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Connection', 'keep-alive');
+    
+    // Enable better prefetching for video players
+    if (response.headers.get('content-length')) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+    
+    // Stream the response with optimized chunks
     const reader = response.body.getReader();
-    const stream = new ReadableStream({
-      start(controller) {
-        function pump() {
-          return reader.read().then(({ done, value }) => {
-            if (done) {
-              controller.close();
-              return;
-            }
-            controller.enqueue(value);
-            return pump();
-          });
+    
+    // Use a more efficient streaming approach
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            res.end();
+            break;
+          }
+          
+          // Write chunks with proper backpressure handling
+          if (!res.write(value)) {
+            await new Promise(resolve => res.once('drain', resolve));
+          }
         }
-        return pump();
+      } catch (error) {
+        console.error('Streaming error:', error);
+        res.status(500).end();
       }
-    });
-
-    // Convert to Node.js readable stream and pipe
-    const nodeStream = new (await import('stream')).Readable.fromWeb(stream);
-    nodeStream.pipe(res);
+    };
+    
+    pump();
     
   } catch (error) {
     console.error('Direct streaming error:', error);

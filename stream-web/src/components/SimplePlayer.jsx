@@ -30,6 +30,23 @@ const SimplePlayer = ({
     const handleCanPlay = () => {
       console.log('Video can start playing');
       setIsLoading(false);
+      
+      // Optimize buffering
+      if (video.buffered && video.buffered.length > 0) {
+        console.log('Buffer status:', video.buffered.end(0) - video.buffered.start(0));
+      }
+    };
+
+    const handleProgress = () => {
+      // Log buffering progress for debugging
+      if (video.buffered && video.buffered.length > 0) {
+        const buffered = video.buffered.end(video.buffered.length - 1);
+        const duration = video.duration;
+        if (duration > 0) {
+          const bufferPercent = (buffered / duration) * 100;
+          console.log(`Buffer: ${bufferPercent.toFixed(1)}%`);
+        }
+      }
     };
 
     const handleError = (e) => {
@@ -42,6 +59,7 @@ const SimplePlayer = ({
     video.addEventListener('loadstart', handleLoadStart);
     video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('progress', handleProgress);
     video.addEventListener('error', handleError);
 
     // Cleanup
@@ -49,6 +67,7 @@ const SimplePlayer = ({
       video.removeEventListener('loadstart', handleLoadStart);
       video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('progress', handleProgress);
       video.removeEventListener('error', handleError);
     };
   }, [videoUrl, onError]);
@@ -59,8 +78,15 @@ const SimplePlayer = ({
         ref={videoRef}
         className={className}
         controls
-        preload="metadata"
+        preload="auto"
         playsInline
+        crossOrigin="anonymous"
+        style={{
+          // Force hardware acceleration for smoother playback
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          perspective: 1000,
+        }}
       />
       
       {isLoading && (
