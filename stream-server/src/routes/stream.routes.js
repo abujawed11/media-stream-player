@@ -53,19 +53,40 @@ router.get("/simple/:sessionId", async (req, res) => {
     return res.status(404).json({ ok: false, error: "Session not found" });
   }
 
+  // Touch session to prevent idle cleanup
+  SessionService.touch(sessionId);
+  console.log('Session touched to prevent cleanup');
+
+  // Handle client disconnection
+  req.on('aborted', () => {
+    console.log('Client disconnected from simple stream');
+  });
+  
+  req.on('close', () => {
+    console.log('Client closed simple stream connection');
+  });
+
   try {
     const range = req.headers.range;
     const headers = {
       'User-Agent': process.env.HTTP_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       'Referer': process.env.HTTP_REFERER || 'https://www.seedr.cc/',
       'Accept': '*/*',
-      'Connection': 'keep-alive'
+      'Connection': 'keep-alive',
+      'Accept-Encoding': 'identity' // Disable compression for better seeking
     };
     
     // Forward range requests for seeking
-    if (range) headers['Range'] = range;
+    if (range) {
+      headers['Range'] = range;
+      console.log('Range request:', range);
+    }
 
     const response = await fetch(session.originalUrl, { headers });
+    
+    // Log response for debugging
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
     // Set response status
     res.status(response.status);
@@ -78,8 +99,16 @@ router.get("/simple/:sessionId", async (req, res) => {
     
     headersToForward.forEach(header => {
       const value = response.headers.get(header);
-      if (value) res.setHeader(header, value);
+      if (value) {
+        res.setHeader(header, value);
+        console.log(`Forwarded header ${header}:`, value);
+      }
     });
+    
+    // Ensure accept-ranges is set for seeking support
+    if (!response.headers.get('accept-ranges')) {
+      res.setHeader('accept-ranges', 'bytes');
+    }
     
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -98,13 +127,24 @@ router.get("/simple/:sessionId", async (req, res) => {
     // Stream the video data with optimized chunks
     const reader = response.body.getReader();
     
-    // Use a more efficient streaming approach
+    // Use a more efficient streaming approach with timeout handling
     const pump = async () => {
       try {
+        let lastActivity = Date.now();
+        const TIMEOUT = 30000; // 30 second timeout
+        
         while (true) {
-          const { done, value } = await reader.read();
+          // Add timeout for read operations
+          const readPromise = reader.read();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Read timeout')), TIMEOUT)
+          );
+          
+          const { done, value } = await Promise.race([readPromise, timeoutPromise]);
+          lastActivity = Date.now();
           
           if (done) {
+            console.log('Simple stream completed successfully');
             res.end();
             break;
           }
@@ -115,8 +155,18 @@ router.get("/simple/:sessionId", async (req, res) => {
           }
         }
       } catch (error) {
-        console.error('Streaming error:', error);
-        res.status(500).end();
+        console.error('Simple streaming error:', error);
+        if (!res.headersSent) {
+          res.status(500).end();
+        } else {
+          res.end();
+        }
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch (e) {
+          // Reader might already be released
+        }
       }
     };
     
@@ -142,6 +192,9 @@ router.get("/direct/:sessionId", async (req, res) => {
   if (!session || !session.originalUrl) {
     return res.status(404).json({ ok: false, error: "Session not found" });
   }
+
+  // Touch session to prevent idle cleanup
+  SessionService.touch(sessionId);
 
   try {
     const { default: fetch } = await import('node-fetch');

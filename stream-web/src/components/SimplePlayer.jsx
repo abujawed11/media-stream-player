@@ -49,6 +49,54 @@ const SimplePlayer = ({
       }
     };
 
+    const handleSeeking = () => {
+      console.log('Seeking to:', video.currentTime);
+      setIsLoading(true);
+      
+      // Check if seeking position is in buffered range
+      const currentTime = video.currentTime;
+      let inBuffer = false;
+      
+      for (let i = 0; i < video.buffered.length; i++) {
+        if (currentTime >= video.buffered.start(i) && currentTime <= video.buffered.end(i)) {
+          inBuffer = true;
+          break;
+        }
+      }
+      
+      if (!inBuffer) {
+        console.log('Seeking outside buffer range, may cause rebuffering');
+      }
+    };
+
+    const handleSeeked = () => {
+      console.log('Seek completed');
+      setIsLoading(false);
+    };
+
+    const handleWaiting = () => {
+      console.log('Video buffering...');
+      setIsLoading(true);
+    };
+
+    const handlePlaying = () => {
+      console.log('Video playing');
+      setIsLoading(false);
+    };
+
+    const handleStalled = () => {
+      console.log('Video stalled - network issues or seeking problems');
+      setIsLoading(true);
+      
+      // Try to recover from stalled state
+      setTimeout(() => {
+        if (video.readyState < 3) { // Not enough data
+          console.log('Attempting to recover from stalled state');
+          video.load(); // Reload the video source
+        }
+      }, 5000);
+    };
+
     const handleError = (e) => {
       console.error('Video error:', e);
       setIsLoading(false);
@@ -60,6 +108,11 @@ const SimplePlayer = ({
     video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('progress', handleProgress);
+    video.addEventListener('seeking', handleSeeking);
+    video.addEventListener('seeked', handleSeeked);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('stalled', handleStalled);
     video.addEventListener('error', handleError);
 
     // Cleanup
@@ -68,6 +121,11 @@ const SimplePlayer = ({
       video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('progress', handleProgress);
+      video.removeEventListener('seeking', handleSeeking);
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('stalled', handleStalled);
       video.removeEventListener('error', handleError);
     };
   }, [videoUrl, onError]);
