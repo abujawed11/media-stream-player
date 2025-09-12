@@ -6,10 +6,11 @@ const sessions = new Map();
 // sessionId -> { cmd, outDir, startedAt, lastAccessAt, status: 'running'|'stopped' }
 
 export const SessionService = {
-    create(sessionId, cmd, outDir) {
+    create(sessionId, cmd, outDir, originalUrl = null) {
         sessions.set(sessionId, {
             cmd,
             outDir,
+            originalUrl,
             startedAt: Date.now(),
             lastAccessAt: Date.now(),
             status: "running",
