@@ -391,10 +391,14 @@ const SimplePlayer = ({
     // For all other streams (remux, simple), use progressive loading
     console.log('📺 Progressive stream detected - using native video player');
     
-    // Progressive loading with optimized settings
+    // Progressive loading with optimized settings for seeking
     video.src = videoUrl;
-    video.preload = 'auto'; // Preload for smoother playback
+    video.preload = 'metadata'; // Load metadata for duration and seeking support
     video.currentTime = 0;  // Always start from beginning
+    
+    // Enable seeking optimizations
+    video.crossOrigin = 'anonymous'; // Enable CORS for range requests
+    video.style.transform = 'translateZ(0)'; // Hardware acceleration
     
     // Add event listeners for progressive loading
     const handleLoadedMetadata = () => {
@@ -425,24 +429,45 @@ const SimplePlayer = ({
     };
 
     const handleError = (e) => {
-      console.error('Progressive: Playback error:', e);
+      console.error('Progressive: Playbook error:', e);
       setIsLoading(false);
       onError?.('Progressive video playback error');
+    };
+
+    const handleSeeking = () => {
+      console.log('Progressive: Seeking to', video.currentTime);
+      setIsLoading(true); // Show loading during seek
+    };
+
+    const handleSeeked = () => {
+      console.log('Progressive: Seek completed at', video.currentTime);
+      setIsLoading(false); // Hide loading after seek
+    };
+
+    const handleLoadedData = () => {
+      console.log('Progressive: Data loaded, ready for smooth playback');
+      setIsLoading(false);
     };
 
     // Add event listeners
     video.addEventListener('loadstart', handleLoadStart);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('progress', handleProgress);
+    video.addEventListener('seeking', handleSeeking);
+    video.addEventListener('seeked', handleSeeked);
     video.addEventListener('error', handleError);
 
     // Cleanup function for progressive loading
     return () => {
       video.removeEventListener('loadstart', handleLoadStart);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('progress', handleProgress);
+      video.removeEventListener('seeking', handleSeeking);
+      video.removeEventListener('seeked', handleSeeked);
       video.removeEventListener('error', handleError);
     };
   }, [videoUrl, onError, convertToHls, createHlsInstance]);
@@ -453,10 +478,10 @@ const SimplePlayer = ({
     if (!video) return;
 
     const handlePlay = () => {
-      console.log('Video: Play event');
+      console.log('Video: Play event at position', video.currentTime);
       
-      // If we have a saved position from network issues, restore it
-      if (savedPosition > 0 && video.currentTime < 2) {
+      // If we have a saved position from network issues, restore it only if we're near the beginning
+      if (savedPosition > 0 && video.currentTime < 2 && !video.seeking) {
         console.log('Restoring saved position on manual play:', savedPosition);
         video.currentTime = savedPosition;
         setSavedPosition(0);
@@ -464,12 +489,12 @@ const SimplePlayer = ({
     };
 
     const handlePlaying = () => {
-      console.log('Video: Playing');
+      console.log('Video: Playing at position', video.currentTime);
       setIsLoading(false);
       setIsNetworkDown(false);
       
-      // If we have a saved position and we're playing after a network issue, restore it
-      if (savedPosition > 0 && Math.abs(video.currentTime - savedPosition) > 2) {
+      // Only restore saved position if we're not seeking and we're far from saved position
+      if (savedPosition > 0 && !video.seeking && Math.abs(video.currentTime - savedPosition) > 2) {
         console.log('Restoring position during playback:', savedPosition);
         video.currentTime = savedPosition;
         setSavedPosition(0);
@@ -477,8 +502,11 @@ const SimplePlayer = ({
     };
 
     const handlePause = () => {
-      // Save position when paused in case of network issues
-      setSavedPosition(video.currentTime);
+      console.log('Video: Paused at position', video.currentTime);
+      // Save position when paused in case of network issues (but not during seeking)
+      if (!video.seeking) {
+        setSavedPosition(video.currentTime);
+      }
     };
 
     const handleWaiting = () => {
@@ -553,14 +581,17 @@ const SimplePlayer = ({
         ref={videoRef}
         className={className}
         controls
-        preload="auto"
+        preload="metadata"
         playsInline
         crossOrigin="anonymous"
+        controlsList="nodownload"
+        disablePictureInPicture={false}
         style={{
-          // Force hardware acceleration for smooth playback
+          // Force hardware acceleration for smooth playback and seeking
           transform: 'translateZ(0)',
           backfaceVisibility: 'hidden',
           perspective: 1000,
+          willChange: 'transform',
         }}
       />
       
@@ -579,8 +610,9 @@ const SimplePlayer = ({
       {/* Stream mode indicator */}
       <div className="absolute top-2 left-2 bg-blue-600 bg-opacity-70 text-white text-xs px-2 py-1 rounded">
         {videoUrl?.includes('.m3u8') ? 'HLS Stream' : 
-         videoUrl?.includes('/stream/remux.mp4') ? 'Remux MP4' : 
-         videoUrl?.includes('/stream/simple/') ? 'Progressive' : 'Stream'}
+         videoUrl?.includes('/stream/remux-seekable.mp4') ? 'Smart Transcode' :
+         videoUrl?.includes('/stream/remux.mp4') ? 'Smart Remux' : 
+         videoUrl?.includes('/stream/simple/') ? 'Smart Direct' : 'Stream'}
       </div>
       
       {/* Network issue indicator */}

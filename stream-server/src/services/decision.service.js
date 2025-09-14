@@ -1,5 +1,5 @@
 const VIDEO_OK = new Set(["h264", "avc1", "vp8", "vp9"]);
-const AUDIO_OK = new Set(["aac", "mp4a", "opus"]);
+const AUDIO_OK = new Set(["aac", "mp4a", "opus", "mp3"]);
 
 export function decidePlayback(streams = [], formatName = "") {
   const vids = streams.filter(s => s.codec_type === "video");

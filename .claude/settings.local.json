@@ -11,7 +11,8 @@
       "Bash(pgrep:*)",
       "Bash(wmic:*)",
       "Bash(taskkill:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(netstat:*)"
     ],
     "deny": [],
     "ask": []

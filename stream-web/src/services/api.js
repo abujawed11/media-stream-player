@@ -11,6 +11,34 @@ const api = axios.create({
 });
 
 export const streamApi = {
+  // Smart streaming - automatically detects codecs and chooses best approach
+  startSmartStream: async (remoteUrl) => {
+    try {
+      const response = await api.post('/stream/smart/start', { 
+        url: remoteUrl 
+      });
+      
+      if (response.data.ok) {
+        return {
+          success: true,
+          sessionId: response.data.sessionId,
+          videoUrl: `${API_BASE_URL}${response.data.videoUrl}`,
+          mode: response.data.mode,
+          reason: response.data.reason,
+          audioCodec: response.data.audioCodec,
+        };
+      } else {
+        throw new Error(response.data.error || 'Failed to start smart stream');
+      }
+    } catch (error) {
+      console.error('Smart Stream API Error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Network error',
+      };
+    }
+  },
+
   startSimpleStream: async (remoteUrl) => {
     try {
       const response = await api.post('/stream/simple/start', { 
