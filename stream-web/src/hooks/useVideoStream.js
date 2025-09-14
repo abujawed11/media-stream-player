@@ -19,15 +19,30 @@ export const useVideoStream = () => {
     setVideoUrl(null);
 
     try {
-      const result = await streamApi.startSimpleStream(remoteUrl.trim());
+      // Use remux streaming for smooth progressive playback
+      console.log('🚀 Starting remux stream for:', remoteUrl.trim());
+      const result = await streamApi.startRemuxStream(remoteUrl.trim());
       
       if (result.success) {
         setSessionId(result.sessionId);
         sessionIdRef.current = result.sessionId;
-        setVideoUrl(result.videoUrl);
+        setVideoUrl(result.streamUrl);
         setError(null);
+        console.log('✅ Remux stream started:', result.streamUrl);
       } else {
-        setError(result.error || 'Failed to start video stream');
+        // Fallback to simple streaming if remux fails
+        console.log('⚠️ Remux failed, falling back to simple streaming...');
+        const fallbackResult = await streamApi.startSimpleStream(remoteUrl.trim());
+        
+        if (fallbackResult.success) {
+          setSessionId(fallbackResult.sessionId);
+          sessionIdRef.current = fallbackResult.sessionId;
+          setVideoUrl(fallbackResult.videoUrl);
+          setError(null);
+          console.log('✅ Simple stream started:', fallbackResult.videoUrl);
+        } else {
+          setError(fallbackResult.error || 'Failed to start video stream');
+        }
       }
     } catch (err) {
       setError('Network error: Could not connect to streaming server');

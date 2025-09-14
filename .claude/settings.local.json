@@ -10,7 +10,8 @@
       "Bash(findstr:*)",
       "Bash(pgrep:*)",
       "Bash(wmic:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(where:*)"
     ],
     "deny": [],
     "ask": []

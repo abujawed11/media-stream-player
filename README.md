@@ -58,22 +58,16 @@ media-stream-player
 │  │  │  ├─ thumbnail.service.ts
 │  │  │  └─ transcoder.service.ts
 │  │  ├─ storage
-│  │  │  ├─ segments
-│  │  │  │  ├─ dash
-│  │  │  │  └─ hls
-│  │  │  │     ├─ dXwpERuZmUPc
-│  │  │  │     └─ qqnxVVFcM8jk
-│  │  │  │        └─ master.m3u8
-│  │  │  ├─ thumbnails
-│  │  │  └─ tmp
-│  │  ├─ typings
-│  │  ├─ utils
-│  │  │  ├─ ffmpeg.ts
-│  │  │  ├─ files.js
-│  │  │  ├─ ids.js
-│  │  │  ├─ ranges.ts
-│  │  │  └─ seedr.ts
-│  │  └─ workers
+│  │  │  └─ segments
+│  │  │     └─ hls
+│  │  │        └─ qqnxVVFcM8jk
+│  │  │           └─ master.m3u8
+│  │  └─ utils
+│  │     ├─ ffmpeg.ts
+│  │     ├─ files.js
+│  │     ├─ ids.js
+│  │     ├─ ranges.ts
+│  │     └─ seedr.ts
 │  ├─ storage
 │  │  └─ segments
 │  │     └─ hls

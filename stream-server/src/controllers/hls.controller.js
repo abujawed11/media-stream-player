@@ -177,7 +177,7 @@ export async function hlsStartController(req, res) {
 
   logger.info({ outDir, sessionId }, "Starting single-variant HLS VOD (prefer copy video, AAC audio)");
 
-  // Input options / headers
+  // Input options / headers optimized for streaming
   const inputOpts = [];
   if (process.env.HTTP_USER_AGENT) inputOpts.push("-user_agent", process.env.HTTP_USER_AGENT);
   if (process.env.HTTP_REFERER)    inputOpts.push("-referer",    process.env.HTTP_REFERER);
@@ -185,9 +185,15 @@ export async function hlsStartController(req, res) {
   const extraHeaders = buildExtraHeaders();
   if (extraHeaders) inputOpts.push("-headers", extraHeaders);
 
-  // Optional: keep probe bounded (faster startup on long remotes)
-  // You can tune these further if needed.
-  inputOpts.push("-analyzeduration", "10M", "-probesize", "10M");
+  // Optimized probe settings for faster startup and real-time processing
+  inputOpts.push(
+    "-analyzeduration", "5M",        // Reduce analysis time for faster startup
+    "-probesize", "5M",              // Smaller probe size
+    "-fflags", "+genpts+igndts",     // Generate PTS, ignore DTS for smoother streaming
+    "-avoid_negative_ts", "disabled", // Don't modify timestamps
+    "-max_delay", "0",               // Minimize delay
+    "-thread_queue_size", "1024"     // Larger thread queue for stability
+  );
 
   // Build command:
   // - copy video (no scaling), transcode audio to AAC (browser-safe, light CPU)
@@ -218,16 +224,24 @@ export async function hlsStartController(req, res) {
       "-b:a", "128k",
       "-ac", "2",
 
-      // HLS streaming with TS segments (for continuous long videos)
+      // HLS streaming optimized for smooth sequential playback
       "-f", "hls",
       "-hls_time", String(targetDur),
-      "-hls_list_size", "0",                    // Keep all segments (no limit)
-      "-hls_playlist_type", "event",            // Event playlist (allows appending new segments)
-      "-hls_flags", "independent_segments+append_list+temp_file", // Append new segments, use temp files
+      "-hls_list_size", String(Math.max(10, Math.ceil(300 / targetDur))), // Keep 5 minutes of segments (minimum 10)
+      "-hls_playlist_type", "vod",              // VOD playlist for predictable behavior
+      "-hls_flags", "independent_segments+program_date_time+temp_file", // Remove append_list to prevent jumping
       "-hls_segment_filename", segPattern,
       "-hls_segment_type", "mpegts",           // Explicit TS format
+      "-hls_start_number_source", "generic",   // Start numbering from 0
+      "-hls_allow_cache", "1",                 // Enable caching for better performance
       "-max_muxing_queue_size", "9999",        // Large mux queue for stability
       "-avoid_negative_ts", "make_zero",       // Handle timestamp issues
+      
+      // Add seeking optimizations to prevent jumping
+      "-copyts",                               // Copy input timestamps
+      "-start_at_zero",                        // Start timestamps at zero
+      "-muxdelay", "0",                        // No mux delay
+      "-muxpreload", "0",                      // No preload delay
     ])
     .output(masterPath)
     .on("start", (line) => logger.info({ line }, "ffmpeg streaming conversion started"))

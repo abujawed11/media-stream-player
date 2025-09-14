@@ -320,6 +320,22 @@ router.get("/hls/status/:sessionId", (req, res) => {
     startedAt: s.startedAt,
     lastAccessAt: s.lastAccessAt,
     outDir: s.outDir,
+    originalUrl: s.originalUrl, // Add original URL to response
+  });
+});
+
+// Status check for simple sessions
+router.get("/simple/status/:sessionId", (req, res) => {
+  const s = SessionService.get?.(req.params.sessionId);
+  if (!s) return res.status(404).json({ ok: false, error: "Session not found" });
+  return res.json({
+    ok: true,
+    sessionId: req.params.sessionId,
+    status: s.status || 'active',
+    startedAt: s.startedAt,
+    lastAccessAt: s.lastAccessAt,
+    originalUrl: s.originalUrl, // This is what we need for HLS conversion
+    mode: 'simple-proxy'
   });
 });
 

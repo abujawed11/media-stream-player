@@ -35,6 +35,26 @@ export const streamApi = {
     }
   },
 
+  // Remux streaming for smooth progressive playback
+  startRemuxStream: async (remoteUrl) => {
+    try {
+      // Use the existing remux endpoint - no session creation needed
+      const streamUrl = `${API_BASE_URL}/stream/remux.mp4?url=${encodeURIComponent(remoteUrl)}`;
+      
+      return {
+        success: true,
+        sessionId: 'remux-' + Date.now(), // Generate a dummy session ID
+        streamUrl: streamUrl,
+      };
+    } catch (error) {
+      console.error('Remux API Error:', error);
+      return {
+        success: false,
+        error: error.message || 'Remux streaming failed',
+      };
+    }
+  },
+
   // Keep old HLS method for backward compatibility
   startHlsStream: async (remoteUrl) => {
     try {

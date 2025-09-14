@@ -132,14 +132,39 @@ const UniversalPlayer = ({
         console.error('HLS Error:', data);
         
         if (data.fatal) {
+          // Save current position for recovery
+          const currentPosition = video.currentTime;
+          
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.log('Network error, attempting to recover...');
+              console.log('Network error, attempting to recover from position:', currentPosition);
               hls.startLoad();
+              
+              // Restore position after recovery
+              if (currentPosition > 0) {
+                const restoreAfterRecovery = () => {
+                  if (video.readyState >= 2) { // HAVE_CURRENT_DATA or better
+                    video.currentTime = currentPosition;
+                    console.log('Position restored after network recovery:', currentPosition);
+                    hls.off(Hls.Events.FRAG_BUFFERED, restoreAfterRecovery);
+                  }
+                };
+                hls.on(Hls.Events.FRAG_BUFFERED, restoreAfterRecovery);
+              }
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.log('Media error, attempting to recover...');
+              console.log('Media error, attempting to recover from position:', currentPosition);
               hls.recoverMediaError();
+              
+              // Restore position after media recovery
+              if (currentPosition > 0) {
+                setTimeout(() => {
+                  if (video.readyState >= 2) {
+                    video.currentTime = currentPosition;
+                    console.log('Position restored after media recovery:', currentPosition);
+                  }
+                }, 1000);
+              }
               break;
             default:
               console.log('Fatal error, cannot recover');
